@@ -4,9 +4,10 @@
 //! 一个输入框，而修改需要「旧密钥 + 新密钥 + 确认新密钥」，重置则需要强提示
 //! 与确认词，混在一个弹窗里会让每个场景都背上无关输入框。
 
-use gpui::{App, Window, px};
+use gpui::{App, AppContext, Window, div, px};
 use gpui_component::input::{Input, InputState};
 use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
+use rust_i18n::t;
 
 use crate::master_key_flow::{self, RESET_CONFIRM_WORD, ResetScope};
 

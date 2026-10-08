@@ -17,7 +17,8 @@ use gpui::{App, AsyncApp, Global};
 use notes::NotesStorage;
 use one_core::cloud_sync::personal::reseal_webdav_password_with_keys;
 use one_core::cloud_sync::{
-    CloudSyncService, GlobalCloudUser, SyncEngine, SyncError, new_user_config, reencrypt_onet_cloud,
+    CloudApiClient, CloudSyncService, GlobalCloudUser, SyncEngine, SyncError, new_user_config,
+    reencrypt_onet_cloud,
 };
 use one_core::crypto;
 use one_core::gpui_tokio::Tokio;
@@ -207,7 +208,7 @@ fn start_cloud_reencrypt(old_key: &str, new_key: &str, key_version: u32, cx: &mu
                 tracing::info!("未登录 Navop Cloud，跳过云端重加密");
                 return false;
             };
-            let client = crate::auth::get_auth_service(cx).cloud_client();
+            let client: Arc<dyn CloudApiClient> = crate::auth::get_auth_service(cx).cloud_client();
             let user_id = user.id.clone();
             let storage = cx.global::<GlobalStorageState>().storage.clone();
             let service = Arc::new(RwLock::new(CloudSyncService::new()));
@@ -281,7 +282,7 @@ pub fn reset_master_key_data(scope: ResetScope, cx: &mut App) -> Result<ResetOut
 
     let clear_table = |table: &str, outcome: &mut ResetOutcome| {
         let sql = format!("DELETE FROM {table}");
-        match connection.with_connection(|conn| conn.execute_batch(&sql)) {
+        match connection.with_connection(|conn| Ok(conn.execute_batch(&sql)?)) {
             Ok(()) => outcome.deleted.push(table.to_string()),
             Err(error) => outcome.failed.push(format!("{table}: {error}")),
         }
