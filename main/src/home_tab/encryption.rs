@@ -303,7 +303,8 @@ impl HomePage {
             window,
             cx,
             Some(Box::new(move |cx: &mut App| {
-                view.update(cx, |home, cx| {
+                // 视图可能已释放（例如弹窗期间窗口关闭），拿不到就无需刷新
+                let _ = view.update(cx, |home, cx| {
                     home.load_connections(cx);
                     if should_auto_onet_cloud_sync(cx, home.current_user.is_some()) {
                         home.trigger_sync(cx);
@@ -324,7 +325,7 @@ impl HomePage {
             window,
             cx,
             Some(Box::new(move |cx: &mut App| {
-                view.update(cx, |home, cx| home.load_connections(cx));
+                let _ = view.update(cx, |home, cx| home.load_connections(cx));
             })),
         );
     }
