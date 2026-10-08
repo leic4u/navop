@@ -15,6 +15,15 @@ use crate::master_key_flow::{self, RESET_CONFIRM_WORD, ResetScope};
 /// 主密钥弹窗成功后的回调（用于让调用方刷新界面状态）
 pub type MasterKeyDialogCallback = Box<dyn Fn(&mut App) + 'static>;
 
+/// 用 `Rc<RefCell<..>>` 包一层：`open_dialog` 的 build 闭包与 `Dialog::on_ok`
+/// 都要求 `Fn`，不能把捕获的回调值移出来。`Rc` 让每个闭包各自持有一份引用，
+/// `RefCell` 让回调能取出后置空——它本就该只触发一次。
+fn shared_callback(
+    callback: Option<MasterKeyDialogCallback>,
+) -> std::rc::Rc<std::cell::RefCell<Option<MasterKeyDialogCallback>>> {
+    std::rc::Rc::new(std::cell::RefCell::new(callback))
+}
+
 /// 修改主密钥弹窗：旧密钥 + 新密钥 + 确认新密钥
 pub fn show_change_master_key_dialog(
     window: &mut Window,
@@ -45,6 +54,7 @@ pub fn show_change_master_key_dialog(
             .masked(true)
     });
     let error_message = cx.new(|_| Option::<String>::None);
+    let on_success = shared_callback(on_success);
 
     let old_for_ok = old_input.clone();
     let new_for_ok = new_input.clone();
@@ -56,6 +66,7 @@ pub fn show_change_master_key_dialog(
     let error_for_render = error_message.clone();
 
     window.open_dialog(cx, move |dialog, _window, cx| {
+        let on_success = on_success.clone();
         let old_for_ok = old_for_ok.clone();
         let new_for_ok = new_for_ok.clone();
         let confirm_for_ok = confirm_for_ok.clone();
@@ -109,8 +120,7 @@ pub fn show_change_master_key_dialog(
                             .to_string()
                         };
                         window.push_notification(message, cx);
-                        // on_ok 是 Fn（可能被重复调用），只能借用回调而不能消耗它
-                        if let Some(callback) = &on_success {
+                        if let Some(callback) = on_success.borrow_mut().take() {
                             callback(cx);
                         }
                         true
@@ -176,6 +186,7 @@ pub fn show_reset_master_key_dialog(
             .masked(false)
     });
     let error_message = cx.new(|_| Option::<String>::None);
+    let on_success = shared_callback(on_success);
 
     let confirm_for_ok = confirm_input.clone();
     let error_for_ok = error_message.clone();
@@ -183,6 +194,7 @@ pub fn show_reset_master_key_dialog(
     let error_for_render = error_message.clone();
 
     window.open_dialog(cx, move |dialog, _window, cx| {
+        let on_success = on_success.clone();
         let confirm_for_ok = confirm_for_ok.clone();
         let error_for_ok = error_for_ok.clone();
 
@@ -214,7 +226,7 @@ pub fn show_reset_master_key_dialog(
                             .to_string()
                         };
                         window.push_notification(message, cx);
-                        if let Some(callback) = &on_success {
+                        if let Some(callback) = on_success.borrow_mut().take() {
                             callback(cx);
                         }
                         true
@@ -244,7 +256,7 @@ pub fn show_reset_master_key_dialog(
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .child(t!("Encryption.reset_master_key_scope").to_string()),
                     )
-                    .child(v_flex().gap_1().children(deleted_labels.into_iter().map(
+                    .child(v_flex().gap_1().children(deleted_labels.iter().map(
                         |label| {
                             div()
                                 .text_sm()
@@ -259,7 +271,7 @@ pub fn show_reset_master_key_dialog(
                                 .font_weight(gpui::FontWeight::SEMIBOLD)
                                 .child(t!("Encryption.reset_master_key_kept").to_string()),
                         )
-                        .child(v_flex().gap_1().children(kept_labels.into_iter().map(
+                        .child(v_flex().gap_1().children(kept_labels.iter().map(
                             |label| {
                                 div()
                                     .text_sm()
