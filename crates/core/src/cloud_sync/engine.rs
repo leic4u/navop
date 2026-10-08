@@ -139,15 +139,16 @@ impl SyncEngine {
 
     /// 确保加密服务已解锁
     fn ensure_unlocked(&self) -> Result<(), SyncError> {
-        // 如果本地 crypto 模块已解锁但同步服务未解锁，同步密钥状态
+        // 以本地 crypto 模块为准：主密钥刚被修改过时，服务里可能还留着旧密钥，
+        // 那样会用旧密钥去解已经换成新密文的云端数据。
         if crypto::has_master_key() {
             if let Some(raw_key) = crypto::get_raw_master_key() {
                 let mut service_write = self
                     .crypto_service
                     .write()
                     .map_err(|_| SyncError::StorageError("同步服务锁获取失败".to_string()))?;
-                if !service_write.is_unlocked() {
-                    tracing::info!("[同步引擎] 从本地 crypto 模块同步密钥状态");
+                if !service_write.master_key_matches(&raw_key) {
+                    tracing::info!("[同步引擎] 主密钥已变更，重新注入同步服务");
                     service_write.set_master_key_directly(raw_key);
                 }
             }
@@ -162,6 +163,40 @@ impl SyncEngine {
             return Err(SyncError::NotUnlocked);
         }
 
+        Ok(())
+    }
+
+    /// 同步前比对云端上报的密钥版本
+    ///
+    /// 云端版本高于本机时，说明主密钥已在其他设备上更换。此时本机密钥一定能
+    /// 通过本地验证（否则根本走不到同步），所以直接给出"请输入新的主密钥"，
+    /// 而不是让用户面对一串解密失败。
+    async fn ensure_cloud_key_version(&self) -> Result<(), SyncError> {
+        if !crate::master_key_meta::exists() {
+            // 本机没有版本记录（升级来的老安装），不做判定，避免误报
+            return Ok(());
+        }
+        let local_version = crate::master_key_meta::key_version();
+        let Ok(Some(config)) = self
+            .cloud_client
+            .get_user_config()
+            .await
+            .map_err(|error| SyncError::NetworkError(format!("{error:?}")))
+        else {
+            // 云端还没有配置（例如首次设置尚未上报），不阻塞同步
+            return Ok(());
+        };
+        if config.key_verification.is_empty() {
+            return Ok(());
+        }
+        if config.key_version > local_version {
+            tracing::warn!(
+                "[同步引擎] 云端密钥版本 {} 高于本机 {}，需要新的主密钥",
+                config.key_version,
+                local_version
+            );
+            return Err(SyncError::MasterKeyChangedOnCloud);
+        }
         Ok(())
     }
 
@@ -180,6 +215,7 @@ impl SyncEngine {
         tracing::info!("========== 开始云同步 ==========");
 
         self.ensure_unlocked()?;
+        self.ensure_cloud_key_version().await?;
 
         match self.refresh_team_key_cache_unlocked().await {
             Ok(count) => {

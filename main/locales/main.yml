@@ -1532,6 +1532,114 @@ Encryption:
     en: Master key is locked, click to unlock
     zh-CN: 主密钥已锁定，点击解锁
     zh-HK: 主密鑰已鎖定，點擊解鎖
+  change_master_key_notice:
+    en: Changing the master key re-encrypts local connections, keychain entries and cached team keys, then rewrites your synced cloud data with the new key. Please keep Navop open until it finishes.
+    zh-CN: 修改主密钥会重新加密本地连接、钥匙串条目与团队密钥缓存，并用新密钥重写已同步的云端数据。请保持 Navop 打开直至完成。
+    zh-HK: 修改主密鑰會重新加密本機連線、鑰匙串項目與團隊密鑰快取，並用新密鑰重寫已同步的雲端資料。請保持 Navop 開啟直至完成。
+  change_master_key_success:
+    en: "Master key updated. {connections} connections, {credentials} keychain entries and {team_keys} team keys were re-encrypted (version {version})."
+    zh-CN: "主密钥已更新。已重新加密 {connections} 个连接、{credentials} 个钥匙串条目、{team_keys} 个团队密钥缓存（版本 {version}）。"
+    zh-HK: "主密鑰已更新。已重新加密 {connections} 個連線、{credentials} 個鑰匙串項目、{team_keys} 個團隊密鑰快取（版本 {version}）。"
+  change_master_key_pending:
+    en: Local data is already protected by the new key, but synced cloud data still needs to be rewritten. It retries automatically before the next sync; other devices cannot read synced data until then.
+    zh-CN: 本地数据已由新密钥保护，但已同步的云端数据仍待重写，将在下一次同步前自动补做；在此之前其他设备无法读取已同步数据。
+    zh-HK: 本機資料已由新密鑰保護，但已同步的雲端資料仍待重寫，將在下一次同步前自動補做；在此之前其他裝置無法讀取已同步資料。
+  reset_master_key:
+    en: Reset Master Key
+    zh-CN: 重置主密钥
+    zh-HK: 重置主密鑰
+  change_master_key_entry_desc:
+    en: Re-encrypt local and cloud data
+    zh-CN: 重新加密本地与云端数据
+    zh-HK: 重新加密本機與雲端資料
+  reset_master_key_entry_desc:
+    en: Clear local and cloud data
+    zh-CN: 清空本地与云端数据
+    zh-HK: 清空本機與雲端資料
+  reset_master_key_notice:
+    en: Resetting clears local encrypted data and the cloud data tied to this key. It cannot be undone.
+    zh-CN: 重置将清除本地加密数据以及与该密钥关联的云端数据，且无法撤销。
+    zh-HK: 重置將清除本機加密資料以及與該密鑰關聯的雲端資料，且無法復原。
+  reset_master_key_confirm_label:
+    en: "Type RESET to continue:"
+    zh-CN: "输入 RESET 以继续："
+    zh-HK: "輸入 RESET 以繼續："
+  reset_master_key_confirm_placeholder:
+    en: RESET
+    zh-CN: RESET
+    zh-HK: RESET
+  reset_master_key_invalid:
+    en: The confirmation text does not match. Type RESET to continue.
+    zh-CN: 确认文本不匹配，请输入 RESET 以继续。
+    zh-HK: 確認文字不相符，請輸入 RESET 以繼續。
+  reset_master_key_scope:
+    en: "The following will be permanently deleted:"
+    zh-CN: "以下数据将被永久删除："
+    zh-HK: "以下資料將被永久刪除："
+  reset_master_key_kept:
+    en: "Kept — switch on to delete as well:"
+    zh-CN: "已保留（打开开关表示一并删除）："
+    zh-HK: "已保留（打開開關表示一併刪除）："
+  reset_master_key_done:
+    en: Reset finished. Navop is back to the initial setup state.
+    zh-CN: 重置完成，Navop 已回到初始设置状态。
+    zh-HK: 重置完成，Navop 已回到初始設定狀態。
+  reset_master_key_partial:
+    en: "Some items could not be removed: {error}"
+    zh-CN: "以下内容未能删除：{error}"
+    zh-HK: "以下內容未能刪除：{error}"
+  master_key_changed_elsewhere:
+    en: The master key was changed on another device. Enter the new master key to continue.
+    zh-CN: 主密钥已在其他设备上被修改，请输入新的主密钥以继续。
+    zh-HK: 主密鑰已在其他裝置上被修改，請輸入新的主密鑰以繼續。
+  reset_scope_required:
+    en: Connections, credentials and groups
+    zh-CN: 连接、凭据与工作区分组
+    zh-HK: 連線、憑證與工作區分組
+  reset_scope_credentials:
+    en: Keychain entries, team key cache and local key files
+    zh-CN: 钥匙串条目、团队密钥缓存与本地密钥文件
+    zh-HK: 鑰匙串項目、團隊密鑰快取與本機密鑰檔案
+  reset_scope_team_data:
+    en: Cloud team data
+    zh-CN: 云端团队数据
+    zh-HK: 雲端團隊資料
+  reset_scope_team_data_desc:
+    en: Team connections stored in the cloud (encrypted with the team key)
+    zh-CN: 云端共享的团队连接数据（由团队密钥加密）
+    zh-HK: 雲端共享的團隊連線資料（由團隊密鑰加密）
+  reset_scope_query_history:
+    en: Query history
+    zh-CN: 查询历史
+    zh-HK: 查詢歷史
+  reset_scope_query_history_desc:
+    en: SQL execution history stored on this machine
+    zh-CN: 保存在本机的 SQL 执行历史
+    zh-HK: 儲存在本機的 SQL 執行歷史
+  reset_scope_command_history:
+    en: Command history and quick commands
+    zh-CN: 命令历史与快捷命令
+    zh-HK: 命令歷史與快速命令
+  reset_scope_command_history_desc:
+    en: Terminal command history and saved quick commands
+    zh-CN: 终端命令历史与已保存的快捷命令
+    zh-HK: 終端命令歷史與已儲存的快速命令
+  reset_scope_notes:
+    en: Note files
+    zh-CN: 笔记文件
+    zh-HK: 筆記檔案
+  reset_scope_notes_desc:
+    en: Markdown files in the notes directory (removed from disk)
+    zh-CN: 笔记目录中的 Markdown 文件（从磁盘删除）
+    zh-HK: 筆記目錄中的 Markdown 檔案（從磁碟刪除）
+  reset_scope_cloud_sync:
+    en: Cloud sync data and versions
+    zh-CN: 云同步数据与版本信息
+    zh-HK: 雲端同步資料與版本資訊
+  reset_scope_cloud_sync_desc:
+    en: Synced records and version info in Navop Cloud or your configured sync destination
+    zh-CN: Navop Cloud 或已配置同步目标中的同步记录与版本信息
+    zh-HK: Navop Cloud 或已設定同步目標中的同步記錄與版本資訊
 
 # 视图模式
 ViewMode:
@@ -4348,6 +4456,14 @@ Settings:
       en: Account
       zh-CN: 账户
       zh-HK: 帳戶
+    master_key_section:
+      en: Master Key
+      zh-CN: 主密钥
+      zh-HK: 主密鑰
+    master_key_section_desc:
+      en: Changing the master key re-encrypts local and synced data with the new key. Resetting clears local data and the cloud data tied to this key.
+      zh-CN: 修改主密钥会用新密钥重新加密本地与已同步数据；重置主密钥会清空本地数据以及与该密钥关联的云端数据。
+      zh-HK: 修改主密鑰會用新密鑰重新加密本機與已同步資料；重置主密鑰會清空本機資料以及與該密鑰關聯的雲端資料。
     username:
       en: "Username:"
       zh-CN: "用户名："

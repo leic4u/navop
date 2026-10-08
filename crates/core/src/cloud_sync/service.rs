@@ -17,6 +17,8 @@ pub enum SyncError {
     InvalidMasterKey,
     /// 密钥版本不匹配
     KeyVersionMismatch,
+    /// 云端主密钥已被其他设备更换，本机密钥已过期
+    MasterKeyChangedOnCloud,
     /// 网络错误
     NetworkError(String),
     /// 加解密错误
@@ -29,12 +31,33 @@ pub enum SyncError {
     NotLoggedIn,
 }
 
+impl SyncError {
+    /// 是否意味着"本机主密钥已不是云端那一把"
+    ///
+    /// 既包括云端主动上报了更高的密钥版本（其他设备改过主密钥），也包括拉取
+    /// 下来的密文用本机密钥解不开——本机密钥刚通过本地验证，所以后者只可能是
+    /// 云端数据由另一把密钥加密。这两种情况都引导用户输入新的主密钥，而不是
+    /// 让他怀疑自己输错了。
+    pub fn is_master_key_mismatch(&self) -> bool {
+        match self {
+            SyncError::MasterKeyChangedOnCloud | SyncError::KeyVersionMismatch => true,
+            SyncError::CryptoError(CryptoError::DecryptionFailed) => true,
+            SyncError::CryptoError(CryptoError::NoPasswordSet)
+            | SyncError::CryptoError(CryptoError::LoadVerificationFailed) => true,
+            _ => false,
+        }
+    }
+}
+
 impl std::fmt::Display for SyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SyncError::NotUnlocked => write!(f, "请先输入主密钥解锁"),
             SyncError::InvalidMasterKey => write!(f, "主密钥错误"),
             SyncError::KeyVersionMismatch => write!(f, "密钥版本不匹配，请重新同步"),
+            SyncError::MasterKeyChangedOnCloud => {
+                write!(f, "云端主密钥已在其他设备上被修改，请输入新的主密钥")
+            }
             SyncError::NetworkError(e) => write!(f, "网络错误: {}", e),
             SyncError::CryptoError(e) => write!(f, "加解密错误: {}", e),
             SyncError::DataFormatError(e) => write!(f, "数据格式错误: {}", e),
@@ -155,6 +178,14 @@ impl CloudSyncService {
     pub fn set_master_key_directly(&mut self, master_key: String) {
         self.master_key = Some(master_key);
         // key_version 保持默认或之前的值，实际同步时会从云端更新
+    }
+
+    /// 服务内当前的主密钥是否与给定密钥一致
+    ///
+    /// 主密钥被修改后，持有旧密钥的同步服务必须被重新注入，否则会用旧密钥去
+    /// 解已经换成新密文的云端数据。
+    pub fn master_key_matches(&self, master_key: &str) -> bool {
+        self.master_key.as_deref() == Some(master_key)
     }
 
     /// 解锁同步服务（验证主密钥）

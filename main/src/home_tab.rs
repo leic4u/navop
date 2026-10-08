@@ -27,8 +27,8 @@ use gpui_component::{
 use mongodb_view::{MongoFormWindow, MongoFormWindowConfig};
 use one_assets::IconName;
 use one_core::cloud_sync::{
-    CloudAccountScope, CloudApiClient, CloudSyncService, SyncConflict, SyncEngine, TeamOption,
-    UserInfo, get_cached_team_display_options_for_scope, get_cached_team_options,
+    CloudAccountScope, CloudApiClient, CloudSyncService, SyncConflict, SyncEngine, SyncError,
+    TeamOption, UserInfo, get_cached_team_display_options_for_scope, get_cached_team_options,
 };
 use one_core::config::{team_management_url_template, website_base_url};
 use one_core::connection_notifier::{ConnectionDataEvent, emit_connection_event, get_notifier};

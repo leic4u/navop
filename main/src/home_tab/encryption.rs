@@ -59,16 +59,23 @@ impl HomePage {
         if self.master_key_dialog_open {
             return;
         }
+
+        // 已解锁状态下这个入口就是"修改主密钥"。修改需要旧密钥 + 新密钥 +
+        // 确认新密钥三个输入框，与首次设置/解锁的单输入框弹窗是两件事，因此
+        // 在这里就转交出去，避免弹窗叠加。
+        if crypto::has_repo_password_set() && crypto::has_master_key() {
+            self.show_change_master_key_dialog(window, cx);
+            return;
+        }
+
         self.master_key_dialog_open = true;
 
         let view = cx.entity();
         let has_password_set = crypto::has_repo_password_set();
-        let has_key_in_memory = crypto::has_master_key();
         let is_first_setup = !has_password_set;
-        let is_change_mode = has_password_set && has_key_in_memory;
         let require_master_key_on_startup =
             AppSettings::current(cx).master_key_on_startup_required();
-        let startup_lock = require_master_key_on_startup && has_password_set && !has_key_in_memory;
+        let startup_lock = require_master_key_on_startup && has_password_set && !crypto::has_master_key();
         let initial_master_key = (!startup_lock)
             .then(|| {
                 crypto::get_raw_master_key().or_else(|| {
@@ -100,8 +107,6 @@ impl HomePage {
 
         let dialog_title = if is_first_setup {
             t!("Encryption.set_repo_password")
-        } else if is_change_mode {
-            t!("Encryption.change_repo_password")
         } else {
             t!("Encryption.unlock_repo_password")
         };
@@ -147,47 +152,6 @@ impl HomePage {
                         };
                     }
 
-                    if is_change_mode {
-                        let old_key = match crypto::get_raw_master_key() {
-                            Some(key) if !key.is_empty() => key,
-                            _ => {
-                                error_msg_ok.update(cx, |msg, cx| {
-                                    *msg = Some(t!("Encryption.password_incorrect").to_string());
-                                    cx.notify();
-                                });
-                                return false;
-                            }
-                        };
-
-                        if input_key != old_key {
-                            let storage = cx.global::<GlobalStorageState>().storage.clone();
-                            match rotate_master_key(
-                                &storage,
-                                &old_key,
-                                &input_key,
-                                require_master_key_on_startup,
-                            ) {
-                                Ok(stats) => {
-                                    tracing::info!(
-                                        "主密钥修改成功，已重新加密 {} 个连接和 {} 个钥匙串条目",
-                                        stats.connections,
-                                        stats.credentials
-                                    );
-                                }
-                                Err(error) => {
-                                    tracing::error!("修改主密钥失败: {}", error);
-                                    error_msg_ok.update(cx, |msg, cx| {
-                                        *msg = Some(error.to_string());
-                                        cx.notify();
-                                    });
-                                    return false;
-                                }
-                            }
-                        }
-
-                        return true;
-                    }
-
                     let result = if require_master_key_on_startup {
                         crypto::verify_and_set_master_key_for_session(&input_key)
                     } else {
@@ -213,6 +177,9 @@ impl HomePage {
                             if crypto::has_master_key() {
                                 // 密钥已就绪后刷新连接列表，修复启动时序导致的空密码回显
                                 this.load_connections(cx);
+                                // 把当前密钥版本同步到云端，其他设备据此识别
+                                // "云端密钥被改过"而不是"自己输错了"
+                                crate::master_key_flow::report_key_version_to_cloud(cx);
                                 if should_auto_onet_cloud_sync(cx, this.current_user.is_some()) {
                                     tracing::info!("密钥设置/解锁成功，自动触发云同步");
                                     this.trigger_sync(cx);
@@ -323,6 +290,44 @@ impl HomePage {
             Err(message) => window.push_notification(message, cx),
         }
     }
+
+    /// 修改主密钥。成功后刷新连接列表并触发全量同步，
+    /// 让其他设备尽快看到"云端密钥已被更换"。
+    pub(crate) fn show_change_master_key_dialog(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let view = cx.entity().downgrade();
+        crate::master_key_dialogs::show_change_master_key_dialog(
+            window,
+            cx,
+            Some(Box::new(move |cx: &mut App| {
+                view.update(cx, |home, cx| {
+                    home.load_connections(cx);
+                    if should_auto_onet_cloud_sync(cx, home.current_user.is_some()) {
+                        home.trigger_sync(cx);
+                    }
+                });
+            })),
+        );
+    }
+
+    /// 重置主密钥。成功后本地回到全新安装状态，刷新连接列表即可看到空列表。
+    pub(crate) fn show_reset_master_key_dialog(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let view = cx.entity().downgrade();
+        crate::master_key_dialogs::show_reset_master_key_dialog(
+            window,
+            cx,
+            Some(Box::new(move |cx: &mut App| {
+                view.update(cx, |home, cx| home.load_connections(cx));
+            })),
+        );
+    }
 }
 
 fn master_key_error_message(error: &crypto::CryptoError) -> String {
@@ -332,33 +337,10 @@ fn master_key_error_message(error: &crypto::CryptoError) -> String {
     }
 }
 
-fn rotate_master_key(
-    storage: &one_core::storage::StorageManager,
-    old_key: &str,
-    new_key: &str,
-    session_only: bool,
-) -> anyhow::Result<one_core::storage::MasterKeyRotationStats> {
-    crypto::validate_master_key_change(old_key, new_key, new_key)?;
-    let connection = storage.connection();
-    let stats = one_core::storage::re_encrypt_secrets(&connection, old_key, new_key)?;
-    let result = if session_only {
-        crypto::change_master_key_for_session(old_key, new_key, new_key)
-    } else {
-        crypto::change_master_key(old_key, new_key, new_key)
-    };
-    if let Err(error) = result {
-        return match one_core::storage::re_encrypt_secrets(&connection, new_key, old_key) {
-            Ok(_) => Err(error.into()),
-            Err(rollback_error) => Err(anyhow::anyhow!(
-                "{error}; 数据库密钥回滚也失败: {rollback_error}"
-            )),
-        };
-    }
-    Ok(stats)
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::master_key_flow::RESET_CONFIRM_WORD;
+
     #[test]
     fn startup_lock_dialog_cannot_be_dismissed_and_does_not_prefill_the_key() {
         let source = include_str!("encryption.rs");
@@ -378,6 +360,7 @@ mod tests {
     #[test]
     fn startup_lock_keeps_the_unlocked_key_in_memory_only() {
         let source = include_str!("encryption.rs");
+        let flow = include_str!("../master_key_flow.rs");
         let dialog = source
             .split("pub(super) fn show_encryption_key_dialog(")
             .nth(1)
@@ -386,22 +369,19 @@ mod tests {
 
         assert!(dialog.contains("crypto::set_master_key_for_session"));
         assert!(dialog.contains("crypto::verify_and_set_master_key_for_session"));
-        assert!(dialog.contains("rotate_master_key("));
-        assert!(source.contains("crypto::change_master_key_for_session"));
+        // 启动锁下改密钥同样只留在内存：编排里按 master_key_on_startup_required 分流
+        assert!(flow.contains("crypto::change_master_key_for_session"));
     }
 
     #[test]
     fn master_key_change_rotates_connections_and_keychain_entries_together() {
-        let source = include_str!("encryption.rs");
-        let implementation = source
-            .split("#[cfg(test)]")
-            .next()
-            .expect("encryption implementation source");
+        let flow = include_str!("../master_key_flow.rs");
 
-        assert!(implementation.contains("one_core::storage::re_encrypt_secrets("));
-        assert!(implementation.contains("stats.connections"));
-        assert!(implementation.contains("stats.credentials"));
-        assert!(!implementation.contains("fn re_encrypt_all_connections("));
+        assert!(flow.contains("one_core::storage::re_encrypt_secrets("));
+        assert!(flow.contains("stats.connections"));
+        assert!(flow.contains("stats.credentials"));
+        assert!(flow.contains("stats.team_key_caches"));
+        assert!(!flow.contains("fn re_encrypt_all_connections("));
     }
 
     #[test]
@@ -415,5 +395,18 @@ mod tests {
 
         assert!(dialog.contains("master_key_error_message(&error)"));
         assert!(source.contains("Encryption.master_key_persistence_failed"));
+    }
+
+    #[test]
+    fn unlocked_dialog_hands_over_to_the_dedicated_change_dialog() {
+        let source = include_str!("encryption.rs");
+        let dialog = source
+            .split("pub(super) fn show_encryption_key_dialog(")
+            .nth(1)
+            .and_then(|source| source.split("pub(super) fn team_management_url").next())
+            .expect("show_encryption_key_dialog source");
+
+        assert!(dialog.contains("self.show_change_master_key_dialog(window, cx)"));
+        assert!(RESET_CONFIRM_WORD == "RESET");
     }
 }

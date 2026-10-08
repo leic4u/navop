@@ -24,6 +24,8 @@ mod home;
 mod home_tab;
 mod license;
 mod local_terminal_profiles;
+mod master_key_dialogs;
+mod master_key_flow;
 mod navigation_applications;
 mod navop_app;
 pub mod new_connection;

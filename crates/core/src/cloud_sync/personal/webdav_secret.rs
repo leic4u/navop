@@ -59,6 +59,26 @@ pub fn open(stored: &str) -> String {
     crypto::decrypt_with_key(stored, local_fallback_key()).unwrap_or_default()
 }
 
+/// 主密钥变更时，把用旧主密钥封存的 WebDAV 密码改封为新主密钥。
+///
+/// 只处理「确实是主密钥密文」的值：本地 fallback 密文与主密钥无关（旧主密钥解
+/// 不开），保持原样；历史明文同样原样返回，下次保存时自然升级为密文。
+pub fn reseal_with_keys(stored: &str, old_key: &str, new_key: &str) -> String {
+    if stored.is_empty() || !crypto::is_encrypted(stored) {
+        return stored.to_string();
+    }
+
+    // 旧主密钥解不开 ⇒ 这是 fallback 密文，不随主密钥变化，原样保留
+    let Ok(plaintext) = crypto::decrypt_with_key(stored, old_key) else {
+        return stored.to_string();
+    };
+    if plaintext.is_empty() {
+        return stored.to_string();
+    }
+
+    crypto::encrypt_with_key(&plaintext, new_key)
+}
+
 fn local_fallback_key() -> &'static str {
     std::str::from_utf8(LOCAL_FALLBACK_KEY).unwrap_or("navop-webdav-local-fallback")
 }

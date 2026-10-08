@@ -86,8 +86,10 @@ impl HomePage {
 
         cx.spawn(async move |this, cx: &mut AsyncApp| {
             let result = match sync_task.await {
-                Ok(result) => result.map_err(|error| error.to_string()),
-                Err(error) => Err(format!("云同步任务执行失败: {error}")),
+                Ok(result) => result,
+                Err(error) => Err(SyncError::StorageError(format!(
+                    "云同步任务执行失败: {error}"
+                ))),
             };
 
             _ = this.update(cx, |this, cx| {
@@ -124,7 +126,13 @@ impl HomePage {
                     }
                     Err(e) => {
                         tracing::error!("同步失败: {}", e);
-                        this.cloud_error = Some(e);
+                        // 主密钥被其他设备更换时给出明确提示：此时本机密钥刚通过
+                        // 本地验证，失败只可能是云端换了密钥，而不是用户输错了
+                        this.cloud_error = Some(if e.is_master_key_mismatch() {
+                            t!("Encryption.master_key_changed_elsewhere").to_string()
+                        } else {
+                            e.to_string()
+                        });
                     }
                 }
                 if sync_requested && this.pending_conflicts.is_empty() && this.cloud_error.is_none()

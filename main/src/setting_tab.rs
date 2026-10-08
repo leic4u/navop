@@ -3029,6 +3029,7 @@ fn render_account_section(_window: &mut Window, cx: &App) -> gpui::AnyElement {
                             }),
                     ),
             )
+            .child(master_key_section(cx))
             .into_any_element()
     } else {
         // 未登录状态：显示提示信息
@@ -3041,8 +3042,138 @@ fn render_account_section(_window: &mut Window, cx: &App) -> gpui::AnyElement {
                     .text_color(cx.theme().muted_foreground)
                     .child(t!("Settings.Account.not_logged_in").to_string()),
             )
+            .child(master_key_section(cx))
             .into_any_element()
     }
+}
+
+/// 账户页的「主密钥」区块：修改、重置，以及重置范围勾选。
+///
+/// 勾选项默认全部打开（=重置时删除）；取消勾选即可保留该项数据。重置范围放在
+/// 全局状态里，设置页勾选、弹窗确认时读取的是同一份。
+fn master_key_section(cx: &App) -> gpui::Div {
+    let scope = crate::master_key_flow::reset_scope(cx);
+
+    v_flex()
+        .gap_3()
+        .w_full()
+        .mt_4()
+        .child(
+            div()
+                .text_base()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(t!("Settings.Account.master_key_section").to_string()),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child(t!("Settings.Account.master_key_section_desc").to_string()),
+        )
+        .child(
+            h_flex()
+                .gap_2()
+                .child(
+                    Button::new("change-master-key-button")
+                        .icon(IconName::Edit)
+                        .label(t!("Encryption.change_repo_password").to_string())
+                        .on_click(|_, window, cx| {
+                            crate::master_key_dialogs::show_change_master_key_dialog(
+                                window, cx, None,
+                            );
+                        }),
+                )
+                .child(
+                    Button::new("reset-master-key-button")
+                        .icon(IconName::Delete)
+                        .label(t!("Encryption.reset_master_key").to_string())
+                        .danger()
+                        .on_click(|_, window, cx| {
+                            crate::master_key_dialogs::show_reset_master_key_dialog(
+                                window, cx, None,
+                            );
+                        }),
+                ),
+        )
+        .child(
+            div()
+                .text_sm()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(t!("Encryption.reset_master_key_scope").to_string()),
+        )
+        .child(reset_scope_row(
+            "reset-scope-team-data",
+            t!("Encryption.reset_scope_team_data").to_string(),
+            t!("Encryption.reset_scope_team_data_desc").to_string(),
+            scope.team_data,
+            cx,
+            |scope, checked| scope.team_data = checked,
+        ))
+        .child(reset_scope_row(
+            "reset-scope-query-history",
+            t!("Encryption.reset_scope_query_history").to_string(),
+            t!("Encryption.reset_scope_query_history_desc").to_string(),
+            scope.query_history,
+            cx,
+            |scope, checked| scope.query_history = checked,
+        ))
+        .child(reset_scope_row(
+            "reset-scope-command-history",
+            t!("Encryption.reset_scope_command_history").to_string(),
+            t!("Encryption.reset_scope_command_history_desc").to_string(),
+            scope.command_history,
+            cx,
+            |scope, checked| scope.command_history = checked,
+        ))
+        .child(reset_scope_row(
+            "reset-scope-notes",
+            t!("Encryption.reset_scope_notes").to_string(),
+            t!("Encryption.reset_scope_notes_desc").to_string(),
+            scope.notes,
+            cx,
+            |scope, checked| scope.notes = checked,
+        ))
+        .child(reset_scope_row(
+            "reset-scope-cloud-sync",
+            t!("Encryption.reset_scope_cloud_sync").to_string(),
+            t!("Encryption.reset_scope_cloud_sync_desc").to_string(),
+            scope.cloud_sync,
+            cx,
+            |scope, checked| scope.cloud_sync = checked,
+        ))
+}
+
+fn reset_scope_row(
+    id: &'static str,
+    title: String,
+    description: String,
+    checked: bool,
+    cx: &App,
+    apply: fn(&mut crate::master_key_flow::ResetScope, bool),
+) -> gpui::Div {
+    h_flex()
+        .justify_between()
+        .items_start()
+        .gap_3()
+        .py_1()
+        .child(
+            v_flex()
+                .gap_1()
+                .flex_1()
+                .child(div().text_sm().child(title))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(description),
+                ),
+        )
+        .child(Switch::new(id).checked(checked).on_click(move |value, window, cx| {
+            let mut scope = crate::master_key_flow::reset_scope(cx);
+            apply(&mut scope, *value);
+            crate::master_key_flow::set_reset_scope(scope, cx);
+            window.refresh();
+        }))
 }
 
 // ============================================================================

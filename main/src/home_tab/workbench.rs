@@ -116,6 +116,24 @@ impl HomePage {
                         cx,
                     ))
                     .child(status_row(
+                        "home-navigation-change-master-key",
+                        IconName::Edit,
+                        t!("Encryption.change_repo_password").to_string(),
+                        t!("Encryption.change_master_key_entry_desc").to_string(),
+                        view.clone(),
+                        |home, window, cx| home.show_change_master_key_dialog(window, cx),
+                        cx,
+                    ))
+                    .child(status_row(
+                        "home-navigation-reset-master-key",
+                        IconName::Delete,
+                        t!("Encryption.reset_master_key").to_string(),
+                        t!("Encryption.reset_master_key_entry_desc").to_string(),
+                        view.clone(),
+                        |home, window, cx| home.show_reset_master_key_dialog(window, cx),
+                        cx,
+                    ))
+                    .child(status_row(
                         "home-navigation-key",
                         IconName::Key,
                         t!("Encryption.personal_key").to_string(),

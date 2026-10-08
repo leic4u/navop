@@ -977,3 +977,103 @@ fn personal_sync_status_from_task(
 fn set_status(cx: &mut App, status: PersonalSyncRuntimeStatus) {
     cx.global_mut::<GlobalPersonalSyncRuntime>().status = status;
 }
+
+/// 主密钥变更后，把个人同步远端记录从旧密钥重加密为新密钥。
+///
+/// 业务时间戳没变，个人同步 planner 会判定「已同步」而不重传，所以云端存量
+/// 密文必须主动遍历重写（方案甲）。未完成的部分记 pending 标记，下次同步前补做。
+pub fn reencrypt_cloud_data(old_key: &str, new_key: &str, key_version: u32, cx: &mut App) {
+    let Some(config) = configured_sync_config(cx) else {
+        tracing::info!("个人同步未配置，跳过云端重加密");
+        return;
+    };
+    let http = cx.http_client();
+    let old_key = old_key.to_string();
+    let new_key = new_key.to_string();
+
+    let task = Tokio::spawn(cx, async move {
+        let store = ConfiguredPersonalSyncStore::from_runtime_config(&config, http)?;
+        // 重加密只用 re_encrypt_sync_data（显式传旧/新密钥），不依赖服务内的当前密钥
+        let service = CloudSyncService::new();
+        let stats =
+            one_core::cloud_sync::reencrypt_personal(&store, &service, &old_key, &new_key, key_version)
+                .await?;
+        store.flush().await?;
+        Ok::<_, SyncStoreError>(stats)
+    });
+
+    cx.spawn(async move |_cx: &mut AsyncApp| {
+        match task.await {
+            Ok(Ok(stats)) => {
+                one_core::master_key_meta::set_pending_cloud_reencrypt(stats.incomplete());
+                tracing::info!(
+                    "个人同步云端重加密完成：共 {} 条，重加密 {} 条，失败 {} 条",
+                    stats.total,
+                    stats.re_encrypted,
+                    stats.failed
+                );
+            }
+            Ok(Err(error)) => {
+                one_core::master_key_meta::set_pending_cloud_reencrypt(true);
+                tracing::error!("个人同步云端重加密失败: {error}");
+            }
+            Err(error) => {
+                one_core::master_key_meta::set_pending_cloud_reencrypt(true);
+                tracing::error!("个人同步云端重加密任务失败: {error}");
+            }
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+    .detach();
+}
+
+/// 重置主密钥时清空个人同步远端数据（记录软删除并提交后端）。
+pub fn wipe_cloud_data(cx: &mut App) {
+    let Some(config) = configured_sync_config(cx) else {
+        return;
+    };
+    let http = cx.http_client();
+
+    let task = Tokio::spawn(cx, async move {
+        let store = ConfiguredPersonalSyncStore::from_runtime_config(&config, http)?;
+        let records = store.list_records(None, None).await?;
+        let total = records.len();
+        for record in records {
+            store
+                .tombstone_record(&record.data_type, &record.id, Some(record.version))
+                .await?;
+        }
+        store.flush().await?;
+        Ok::<_, SyncStoreError>(total)
+    });
+
+    cx.spawn(async move |_cx: &mut AsyncApp| {
+        match task.await {
+            Ok(Ok(total)) => {
+                one_core::master_key_meta::set_pending_cloud_wipe(false);
+                tracing::info!("个人同步云端数据已清空：{total} 条");
+            }
+            Ok(Err(error)) => {
+                one_core::master_key_meta::set_pending_cloud_wipe(true);
+                tracing::error!("个人同步云端数据清空失败: {error}");
+            }
+            Err(error) => {
+                one_core::master_key_meta::set_pending_cloud_wipe(true);
+                tracing::error!("个人同步云端数据清空任务失败: {error}");
+            }
+        }
+        Ok::<(), anyhow::Error>(())
+    })
+    .detach();
+}
+
+/// 取当前个人同步后端配置。
+///
+/// 与 [`active_or_current_config`] 的区别是不要求「同步总开关已打开且当前
+/// provider 正是个人同步」：重置主密钥时无论当前走哪条同步链路，都要清掉
+/// 已经落在个人同步后端里的数据。
+fn configured_sync_config(cx: &App) -> Option<PersonalSyncRuntimeConfig> {
+    let settings = AppSettings::global(cx);
+    let password = webdav_password_for(&settings.personal_sync);
+    build_personal_sync_runtime_config(&settings.personal_sync, password.as_deref()).ok()
+}

@@ -231,6 +231,29 @@ impl HomePage {
             |home, window, cx| home.show_encryption_key_dialog(window, cx),
         ));
 
+        // 主密钥维护入口：修改与重置都带独立弹窗，避免与解锁弹窗混在一起
+        menu = menu.child(account_menu_row(
+            view.clone(),
+            IconName::Edit,
+            t!("Encryption.change_repo_password").to_string(),
+            None,
+            false,
+            false,
+            cx,
+            |home, window, cx| home.show_change_master_key_dialog(window, cx),
+        ));
+
+        menu = menu.child(account_menu_row(
+            view.clone(),
+            IconName::Delete,
+            t!("Encryption.reset_master_key").to_string(),
+            None,
+            false,
+            true,
+            cx,
+            |home, window, cx| home.show_reset_master_key_dialog(window, cx),
+        ));
+
         if show_team_key {
             menu = menu.child(account_menu_row(
                 view.clone(),
