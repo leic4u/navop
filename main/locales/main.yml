@@ -1537,9 +1537,9 @@ Encryption:
     zh-CN: 修改主密钥会重新加密本地连接、钥匙串条目与团队密钥缓存，并用新密钥重写已同步的云端数据。请保持 Navop 打开直至完成。
     zh-HK: 修改主密鑰會重新加密本機連線、鑰匙串項目與團隊密鑰快取，並用新密鑰重寫已同步的雲端資料。請保持 Navop 開啟直至完成。
   change_master_key_success:
-    en: "Master key updated. {connections} connections, {credentials} keychain entries and {team_keys} team keys were re-encrypted (version {version})."
-    zh-CN: "主密钥已更新。已重新加密 {connections} 个连接、{credentials} 个钥匙串条目、{team_keys} 个团队密钥缓存（版本 {version}）。"
-    zh-HK: "主密鑰已更新。已重新加密 {connections} 個連線、{credentials} 個鑰匙串項目、{team_keys} 個團隊密鑰快取（版本 {version}）。"
+    en: "Master key updated. %{connections} connections, %{credentials} keychain entries and %{team_keys} team keys were re-encrypted (version %{version})."
+    zh-CN: "主密钥已更新。已重新加密 %{connections} 个连接、%{credentials} 个钥匙串条目、%{team_keys} 个团队密钥缓存（版本 %{version}）。"
+    zh-HK: "主密鑰已更新。已重新加密 %{connections} 個連線、%{credentials} 個鑰匙串項目、%{team_keys} 個團隊密鑰快取（版本 %{version}）。"
   change_master_key_pending:
     en: Local data is already protected by the new key, but synced cloud data still needs to be rewritten. It retries automatically before the next sync; other devices cannot read synced data until then.
     zh-CN: 本地数据已由新密钥保护，但已同步的云端数据仍待重写，将在下一次同步前自动补做；在此之前其他设备无法读取已同步数据。
@@ -1597,9 +1597,9 @@ Encryption:
     zh-CN: 重置完成，Navop 已回到初始设置状态。
     zh-HK: 重置完成，Navop 已回到初始設定狀態。
   reset_master_key_partial:
-    en: "Some items could not be removed: {error}"
-    zh-CN: "以下内容未能删除：{error}"
-    zh-HK: "以下內容未能刪除：{error}"
+    en: "Some items could not be removed: %{error}"
+    zh-CN: "以下内容未能删除：%{error}"
+    zh-HK: "以下內容未能刪除：%{error}"
   master_key_changed_elsewhere:
     en: The master key was changed on another device. Enter the new master key to continue.
     zh-CN: 主密钥已在其他设备上被修改，请输入新的主密钥以继续。
