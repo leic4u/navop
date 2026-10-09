@@ -13,7 +13,7 @@
 
 use std::sync::{Arc, RwLock};
 
-use gpui::{App, AsyncApp, Global, Window};
+use gpui::{App, AsyncApp, Global};
 use rust_i18n::t;
 use notes::NotesStorage;
 use one_core::cloud_sync::personal::reseal_webdav_password_with_keys;
@@ -31,6 +31,12 @@ use crate::personal_sync_runtime;
 
 /// 重置确认词
 pub const RESET_CONFIRM_WORD: &str = "RESET";
+
+/// 云端重加密结束后的结果通知：参数是给用户看的提示文案。
+///
+/// 用闭包而不是直接传 `WindowHandle`：句柄是泛型类型，在异步任务里还要跨
+/// App / Window 边界，交给调用方（握有 window 的那一侧）封装最省事。
+pub type CloudReencryptNotifier = Box<dyn Fn(&mut App, String) + 'static>;
 
 /// 主密钥固定必清的本地表：连接、钥匙串、分组与各类同步缓存。
 ///
@@ -106,15 +112,14 @@ pub struct ChangeOutcome {
 
 /// 执行主密钥修改：本地轮换 → 切换密钥 → 版本递增 → 启动云端重加密
 ///
-/// `window` 只用于云端重加密结束后补一条结果提示（异步任务拿不到窗口句柄，
-/// 所以这里先把句柄取出来交给异步任务）。
+/// `notifier` 用于云端重加密结束后补一条结果提示：异步任务拿不到窗口，只能
+/// 由调用方把"怎么弹提示"封装好带进来。
 pub fn apply_change_master_key(
     old_key: &str,
     new_key: &str,
-    window: &mut Window,
+    notifier: Option<CloudReencryptNotifier>,
     cx: &mut App,
 ) -> Result<ChangeOutcome, String> {
-    let window_handle = window.window_handle();
     crypto::validate_master_key_change(old_key, new_key, new_key)
         .map_err(|error| error.to_string())?;
 
@@ -141,7 +146,7 @@ pub fn apply_change_master_key(
     reseal_webdav_password(old_key, new_key, cx);
     let key_version = master_key_meta::bump_key_version();
     let cloud_reencrypt_started =
-        start_cloud_reencrypt(old_key, new_key, key_version, window_handle, cx);
+        start_cloud_reencrypt(old_key, new_key, key_version, notifier, cx);
 
     Ok(ChangeOutcome {
         connections: stats.connections,
@@ -206,7 +211,7 @@ fn start_cloud_reencrypt(
     old_key: &str,
     new_key: &str,
     key_version: u32,
-    window_handle: gpui::WindowHandle,
+    notifier: Option<CloudReencryptNotifier>,
     cx: &mut App,
 ) -> bool {
     match AppSettings::global(cx).sync_provider {
@@ -214,7 +219,7 @@ fn start_cloud_reencrypt(
             old_key,
             new_key,
             key_version,
-            window_handle,
+            notifier,
             cx,
         ),
         SyncProvider::OnetCloud => {
@@ -278,8 +283,10 @@ fn start_cloud_reencrypt(
                         t!("Encryption.cloud_reencrypt_failed").to_string()
                     }
                 };
-                let _ = cx.update_window(window_handle, |_, window, cx| {
-                    window.push_notification(message, cx);
+                let _ = cx.update(move |cx: &mut App| {
+                    if let Some(notify) = notifier.as_ref() {
+                        notify(cx, message.clone());
+                    }
                 });
                 Ok::<(), anyhow::Error>(())
             })

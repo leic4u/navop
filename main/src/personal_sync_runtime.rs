@@ -987,7 +987,7 @@ pub fn reencrypt_cloud_data(
     old_key: &str,
     new_key: &str,
     key_version: u32,
-    window_handle: gpui::WindowHandle,
+    notifier: Option<crate::master_key_flow::CloudReencryptNotifier>,
     cx: &mut App,
 ) -> bool {
     let Some(config) = configured_sync_config(cx) else {
@@ -1036,8 +1036,10 @@ pub fn reencrypt_cloud_data(
                 t!("Encryption.cloud_reencrypt_failed").to_string()
             }
         };
-        let _ = cx.update_window(window_handle, |_, window, cx| {
-            window.push_notification(message, cx);
+        let _ = cx.update(move |cx: &mut App| {
+            if let Some(notify) = notifier.as_ref() {
+                notify(cx, message.clone());
+            }
         });
         Ok::<(), anyhow::Error>(())
     })

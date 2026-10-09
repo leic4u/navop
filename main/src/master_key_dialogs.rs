@@ -56,6 +56,15 @@ pub fn show_change_master_key_dialog(
     });
     let error_message = cx.new(|_| Option::<String>::None);
     let on_success = shared_callback(on_success);
+    // 云端重加密的结果提示要在异步任务结束后才弹，这里先把"怎么弹"封好
+    let window_handle = window.window_handle();
+    let notifier: Option<master_key_flow::CloudReencryptNotifier> =
+        Some(Box::new(move |cx: &mut App, message: String| {
+            let _ = cx.update_window(window_handle, |_, window, cx| {
+                window.push_notification(message, cx);
+            });
+        }));
+    let notifier = std::rc::Rc::new(std::cell::RefCell::new(notifier));
 
     let old_for_ok = old_input.clone();
     let new_for_ok = new_input.clone();
@@ -68,6 +77,7 @@ pub fn show_change_master_key_dialog(
 
     window.open_dialog(cx, move |dialog, _window, cx| {
         let on_success = on_success.clone();
+        let notifier = notifier.clone();
         let old_for_ok = old_for_ok.clone();
         let new_for_ok = new_for_ok.clone();
         let confirm_for_ok = confirm_for_ok.clone();
@@ -98,7 +108,12 @@ pub fn show_change_master_key_dialog(
                     return false;
                 }
 
-                match master_key_flow::apply_change_master_key(&old_key, &new_key, window, cx) {
+                match master_key_flow::apply_change_master_key(
+                    &old_key,
+                    &new_key,
+                    notifier.borrow_mut().take(),
+                    cx,
+                ) {
                     Ok(outcome) => {
                         tracing::info!(
                             "主密钥修改完成：连接 {}，钥匙串 {}，团队密钥缓存 {}，版本 {}，云端重加密已启动 {}",
