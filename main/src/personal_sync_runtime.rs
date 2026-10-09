@@ -20,6 +20,7 @@ use one_core::storage::{
     ConnectionRepository, ConnectionType, CredentialRepository, CredentialSummary, DatabaseType,
     GlobalStorageState, StoredConnection, Workspace, WorkspaceRepository,
 };
+use rust_i18n::t;
 
 use crate::personal_sync_status::PersonalSyncRuntimeStatus;
 
@@ -982,10 +983,16 @@ fn set_status(cx: &mut App, status: PersonalSyncRuntimeStatus) {
 ///
 /// 业务时间戳没变，个人同步 planner 会判定「已同步」而不重传，所以云端存量
 /// 密文必须主动遍历重写（方案甲）。未完成的部分记 pending 标记，下次同步前补做。
-pub fn reencrypt_cloud_data(old_key: &str, new_key: &str, key_version: u32, cx: &mut App) {
+pub fn reencrypt_cloud_data(
+    old_key: &str,
+    new_key: &str,
+    key_version: u32,
+    window_handle: gpui::WindowHandle,
+    cx: &mut App,
+) -> bool {
     let Some(config) = configured_sync_config(cx) else {
         tracing::info!("个人同步未配置，跳过云端重加密");
-        return;
+        return false;
     };
     let http = cx.http_client();
     let old_key = old_key.to_string();
@@ -1002,8 +1009,8 @@ pub fn reencrypt_cloud_data(old_key: &str, new_key: &str, key_version: u32, cx: 
         Ok::<_, SyncStoreError>(stats)
     });
 
-    cx.spawn(async move |_cx: &mut AsyncApp| {
-        match task.await {
+    cx.spawn(async move |cx: &mut AsyncApp| {
+        let message = match task.await {
             Ok(Ok(stats)) => {
                 one_core::master_key_meta::set_pending_cloud_reencrypt(stats.incomplete());
                 tracing::info!(
@@ -1012,19 +1019,30 @@ pub fn reencrypt_cloud_data(old_key: &str, new_key: &str, key_version: u32, cx: 
                     stats.re_encrypted,
                     stats.failed
                 );
+                if stats.incomplete() {
+                    t!("Encryption.cloud_reencrypt_failed").to_string()
+                } else {
+                    t!("Encryption.cloud_reencrypt_done").to_string()
+                }
             }
             Ok(Err(error)) => {
                 one_core::master_key_meta::set_pending_cloud_reencrypt(true);
                 tracing::error!("个人同步云端重加密失败: {error}");
+                t!("Encryption.cloud_reencrypt_failed").to_string()
             }
             Err(error) => {
                 one_core::master_key_meta::set_pending_cloud_reencrypt(true);
                 tracing::error!("个人同步云端重加密任务失败: {error}");
+                t!("Encryption.cloud_reencrypt_failed").to_string()
             }
-        }
+        };
+        let _ = cx.update_window(window_handle, |_, window, cx| {
+            window.push_notification(message, cx);
+        });
         Ok::<(), anyhow::Error>(())
     })
     .detach();
+    true
 }
 
 /// 重置主密钥时清空个人同步远端数据（记录软删除并提交后端）。

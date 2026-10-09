@@ -13,7 +13,8 @@
 
 use std::sync::{Arc, RwLock};
 
-use gpui::{App, AsyncApp, Global};
+use gpui::{App, AsyncApp, Global, Window};
+use rust_i18n::t;
 use notes::NotesStorage;
 use one_core::cloud_sync::personal::reseal_webdav_password_with_keys;
 use one_core::cloud_sync::{
@@ -99,17 +100,21 @@ pub struct ChangeOutcome {
     pub credentials: usize,
     pub team_key_caches: usize,
     pub key_version: u32,
-    /// 云端重加密是否已启动（未启动时 `pending_cloud_reencrypt` 可能仍为真）
-    pub cloud_started: bool,
-    pub pending_cloud: bool,
+    /// 本次是否真的启动了云端重加密：启动了才会有"云端重写完成 / 失败"的后续提示
+    pub cloud_reencrypt_started: bool,
 }
 
 /// 执行主密钥修改：本地轮换 → 切换密钥 → 版本递增 → 启动云端重加密
+///
+/// `window` 只用于云端重加密结束后补一条结果提示（异步任务拿不到窗口句柄，
+/// 所以这里先把句柄取出来交给异步任务）。
 pub fn apply_change_master_key(
     old_key: &str,
     new_key: &str,
+    window: &mut Window,
     cx: &mut App,
 ) -> Result<ChangeOutcome, String> {
+    let window_handle = window.window_handle();
     crypto::validate_master_key_change(old_key, new_key, new_key)
         .map_err(|error| error.to_string())?;
 
@@ -135,15 +140,15 @@ pub fn apply_change_master_key(
 
     reseal_webdav_password(old_key, new_key, cx);
     let key_version = master_key_meta::bump_key_version();
-    let cloud_started = start_cloud_reencrypt(old_key, new_key, key_version, cx);
+    let cloud_reencrypt_started =
+        start_cloud_reencrypt(old_key, new_key, key_version, window_handle, cx);
 
     Ok(ChangeOutcome {
         connections: stats.connections,
         credentials: stats.credentials,
         team_key_caches: stats.team_key_caches,
         key_version,
-        cloud_started,
-        pending_cloud: master_key_meta::pending_cloud_reencrypt(),
+        cloud_reencrypt_started,
     })
 }
 
@@ -197,12 +202,21 @@ pub fn report_key_version_to_cloud(cx: &mut App) {
 }
 
 /// 启动云端重加密。返回是否真的启动了（未登录/未配置同步时为 false）
-fn start_cloud_reencrypt(old_key: &str, new_key: &str, key_version: u32, cx: &mut App) -> bool {
+fn start_cloud_reencrypt(
+    old_key: &str,
+    new_key: &str,
+    key_version: u32,
+    window_handle: gpui::WindowHandle,
+    cx: &mut App,
+) -> bool {
     match AppSettings::global(cx).sync_provider {
-        SyncProvider::Personal => {
-            personal_sync_runtime::reencrypt_cloud_data(old_key, new_key, key_version, cx);
-            true
-        }
+        SyncProvider::Personal => personal_sync_runtime::reencrypt_cloud_data(
+            old_key,
+            new_key,
+            key_version,
+            window_handle,
+            cx,
+        ),
         SyncProvider::OnetCloud => {
             let Some(user) = GlobalCloudUser::get_user(cx) else {
                 tracing::info!("未登录 Navop Cloud，跳过云端重加密");
@@ -236,8 +250,8 @@ fn start_cloud_reencrypt(old_key: &str, new_key: &str, key_version: u32, cx: &mu
                 Ok::<_, SyncError>(stats)
             });
 
-            cx.spawn(async move |_cx: &mut AsyncApp| {
-                match task.await {
+            cx.spawn(async move |cx: &mut AsyncApp| {
+                let message = match task.await {
                     Ok(Ok(stats)) => {
                         master_key_meta::set_pending_cloud_reencrypt(stats.incomplete());
                         tracing::info!(
@@ -247,16 +261,26 @@ fn start_cloud_reencrypt(old_key: &str, new_key: &str, key_version: u32, cx: &mu
                             stats.failed,
                             stats.skipped_team
                         );
+                        if stats.incomplete() {
+                            t!("Encryption.cloud_reencrypt_failed").to_string()
+                        } else {
+                            t!("Encryption.cloud_reencrypt_done").to_string()
+                        }
                     }
                     Ok(Err(error)) => {
                         master_key_meta::set_pending_cloud_reencrypt(true);
                         tracing::error!("云端重加密失败（已记 pending，下次同步前补做）: {error}");
+                        t!("Encryption.cloud_reencrypt_failed").to_string()
                     }
                     Err(error) => {
                         master_key_meta::set_pending_cloud_reencrypt(true);
                         tracing::error!("云端重加密任务失败（已记 pending）: {error}");
+                        t!("Encryption.cloud_reencrypt_failed").to_string()
                     }
-                }
+                };
+                let _ = cx.update_window(window_handle, |_, window, cx| {
+                    window.push_notification(message, cx);
+                });
                 Ok::<(), anyhow::Error>(())
             })
             .detach();

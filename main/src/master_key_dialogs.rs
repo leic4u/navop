@@ -7,6 +7,7 @@
 use gpui::prelude::FluentBuilder as _;
 use gpui::{App, AppContext, ParentElement, Styled, Window, div, px};
 use gpui_component::input::{Input, InputState};
+use gpui_component::switch::Switch;
 use gpui_component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
 use rust_i18n::t;
 
@@ -97,7 +98,7 @@ pub fn show_change_master_key_dialog(
                     return false;
                 }
 
-                match master_key_flow::apply_change_master_key(&old_key, &new_key, cx) {
+                match master_key_flow::apply_change_master_key(&old_key, &new_key, window, cx) {
                     Ok(outcome) => {
                         tracing::info!(
                             "主密钥修改完成：连接 {}，钥匙串 {}，团队密钥缓存 {}，版本 {}，云端重加密已启动 {}",
@@ -105,20 +106,22 @@ pub fn show_change_master_key_dialog(
                             outcome.credentials,
                             outcome.team_key_caches,
                             outcome.key_version,
-                            outcome.cloud_started
+                            outcome.cloud_reencrypt_started
                         );
-                        let message = if outcome.pending_cloud {
-                            t!("Encryption.change_master_key_pending").to_string()
-                        } else {
-                            t!(
-                                "Encryption.change_master_key_success",
-                                connections = outcome.connections,
-                                credentials = outcome.credentials,
-                                team_keys = outcome.team_key_caches,
-                                version = outcome.key_version
-                            )
-                            .to_string()
-                        };
+                        // 本地结果始终用同一条文案；需要等云端重写时再补一句进度说明，
+                        // 云端重写最终的成功 / 失败由异步任务结束后单独提示一次。
+                        let mut message = t!(
+                            "Encryption.change_master_key_success",
+                            connections = outcome.connections,
+                            credentials = outcome.credentials,
+                            team_keys = outcome.team_key_caches,
+                            version = outcome.key_version
+                        )
+                        .to_string();
+                        if outcome.cloud_reencrypt_started {
+                            message.push('\n');
+                            message.push_str(&t!("Encryption.cloud_reencrypt_in_progress"));
+                        }
                         window.push_notification(message, cx);
                         if let Some(callback) = on_success.borrow_mut().take() {
                             callback(cx);
@@ -177,8 +180,6 @@ pub fn show_reset_master_key_dialog(
     on_success: Option<MasterKeyDialogCallback>,
 ) {
     let scope = master_key_flow::reset_scope(cx);
-    let deleted_labels = deleted_labels(&scope);
-    let kept_labels = kept_labels(&scope);
 
     let confirm_input = cx.new(|cx| {
         InputState::new(window, cx)
@@ -213,6 +214,8 @@ pub fn show_reset_master_key_dialog(
                     return false;
                 }
 
+                // 勾选项是弹窗里现场改的，执行前重新读一次全局范围
+                let scope = master_key_flow::reset_scope(cx);
                 match master_key_flow::reset_master_key_data(scope, cx) {
                     Ok(outcome) => {
                         tracing::info!("主密钥重置完成：已删除 {} 项", outcome.deleted.len());
@@ -256,30 +259,46 @@ pub fn show_reset_master_key_dialog(
                             .font_weight(gpui::FontWeight::SEMIBOLD)
                             .child(t!("Encryption.reset_master_key_scope").to_string()),
                     )
-                    .child(v_flex().gap_1().children(deleted_labels.iter().map(
-                        |label| {
-                            div()
-                                .text_sm()
-                                .text_color(cx.theme().danger)
-                                .child(format!("• {label}"))
-                        },
-                    )))
-                    .when(!kept_labels.is_empty(), |this| {
-                        this.child(
-                            div()
-                                .text_sm()
-                                .font_weight(gpui::FontWeight::SEMIBOLD)
-                                .child(t!("Encryption.reset_master_key_kept").to_string()),
-                        )
-                        .child(v_flex().gap_1().children(kept_labels.iter().map(
-                            |label| {
-                                div()
-                                    .text_sm()
-                                    .text_color(cx.theme().muted_foreground)
-                                    .child(format!("• {label}"))
-                            },
-                        )))
-                    })
+                    .child(reset_scope_row(
+                        "reset-scope-team-data",
+                        t!("Encryption.reset_scope_team_data").to_string(),
+                        t!("Encryption.reset_scope_team_data_desc").to_string(),
+                        scope.team_data,
+                        cx,
+                        |scope, checked| scope.team_data = checked,
+                    ))
+                    .child(reset_scope_row(
+                        "reset-scope-query-history",
+                        t!("Encryption.reset_scope_query_history").to_string(),
+                        t!("Encryption.reset_scope_query_history_desc").to_string(),
+                        scope.query_history,
+                        cx,
+                        |scope, checked| scope.query_history = checked,
+                    ))
+                    .child(reset_scope_row(
+                        "reset-scope-command-history",
+                        t!("Encryption.reset_scope_command_history").to_string(),
+                        t!("Encryption.reset_scope_command_history_desc").to_string(),
+                        scope.command_history,
+                        cx,
+                        |scope, checked| scope.command_history = checked,
+                    ))
+                    .child(reset_scope_row(
+                        "reset-scope-notes",
+                        t!("Encryption.reset_scope_notes").to_string(),
+                        t!("Encryption.reset_scope_notes_desc").to_string(),
+                        scope.notes,
+                        cx,
+                        |scope, checked| scope.notes = checked,
+                    ))
+                    .child(reset_scope_row(
+                        "reset-scope-cloud-sync",
+                        t!("Encryption.reset_scope_cloud_sync").to_string(),
+                        t!("Encryption.reset_scope_cloud_sync_desc").to_string(),
+                        scope.cloud_sync,
+                        cx,
+                        |scope, checked| scope.cloud_sync = checked,
+                    ))
                     .child(
                         div()
                             .text_sm()
@@ -309,45 +328,39 @@ fn key_field(label: String, input: &gpui::Entity<InputState>) -> gpui::Div {
         .child(Input::new(input).mask_toggle().w_full())
 }
 
-fn deleted_labels(scope: &ResetScope) -> Vec<String> {
-    let mut labels = vec![
-        t!("Encryption.reset_scope_required").to_string(),
-        t!("Encryption.reset_scope_credentials").to_string(),
-    ];
-    if scope.team_data {
-        labels.push(t!("Encryption.reset_scope_team_data").to_string());
-    }
-    if scope.query_history {
-        labels.push(t!("Encryption.reset_scope_query_history").to_string());
-    }
-    if scope.command_history {
-        labels.push(t!("Encryption.reset_scope_command_history").to_string());
-    }
-    if scope.notes {
-        labels.push(t!("Encryption.reset_scope_notes").to_string());
-    }
-    if scope.cloud_sync {
-        labels.push(t!("Encryption.reset_scope_cloud_sync").to_string());
-    }
-    labels
-}
-
-fn kept_labels(scope: &ResetScope) -> Vec<String> {
-    let mut labels = Vec::new();
-    if !scope.team_data {
-        labels.push(t!("Encryption.reset_scope_team_data").to_string());
-    }
-    if !scope.query_history {
-        labels.push(t!("Encryption.reset_scope_query_history").to_string());
-    }
-    if !scope.command_history {
-        labels.push(t!("Encryption.reset_scope_command_history").to_string());
-    }
-    if !scope.notes {
-        labels.push(t!("Encryption.reset_scope_notes").to_string());
-    }
-    if !scope.cloud_sync {
-        labels.push(t!("Encryption.reset_scope_cloud_sync").to_string());
-    }
-    labels
+/// 重置范围的一行：开关打开 = 删除该项。
+///
+/// 开关自带内部状态，点击后自己重绘，所以这里不需要 `window.refresh()`。
+fn reset_scope_row(
+    id: &'static str,
+    title: String,
+    description: String,
+    checked: bool,
+    cx: &App,
+    apply: fn(&mut ResetScope, bool),
+) -> gpui::Div {
+    h_flex()
+        .justify_between()
+        .items_start()
+        .gap_3()
+        .py_1()
+        .child(
+            v_flex()
+                .gap_1()
+                .flex_1()
+                .child(div().text_sm().child(title))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(cx.theme().muted_foreground)
+                        .child(description),
+                ),
+        )
+        .child(Switch::new(id).checked(checked).on_click(
+            move |value, _window, cx| {
+                let mut scope = master_key_flow::reset_scope(cx);
+                apply(&mut scope, *value);
+                master_key_flow::set_reset_scope(scope, cx);
+            },
+        ))
 }

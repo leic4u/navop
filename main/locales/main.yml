@@ -1544,6 +1544,18 @@ Encryption:
     en: Local data is already protected by the new key, but synced cloud data still needs to be rewritten. It retries automatically before the next sync; other devices cannot read synced data until then.
     zh-CN: 本地数据已由新密钥保护，但已同步的云端数据仍待重写，将在下一次同步前自动补做；在此之前其他设备无法读取已同步数据。
     zh-HK: 本機資料已由新密鑰保護，但已同步的雲端資料仍待重寫，將在下一次同步前自動補做；在此之前其他裝置無法讀取已同步資料。
+  cloud_reencrypt_in_progress:
+    en: Syncing cloud data with the new key…
+    zh-CN: 正在用新密钥同步云端数据…
+    zh-HK: 正在用新密鑰同步雲端資料…
+  cloud_reencrypt_done:
+    en: Cloud data was re-encrypted. Other devices can now read synced data with the new master key.
+    zh-CN: 云端数据已重新加密成功，其他设备可使用新主密钥获取云端数据。
+    zh-HK: 雲端資料已重新加密成功，其他裝置可使用新主密鑰取得雲端資料。
+  cloud_reencrypt_failed:
+    en: Cloud data re-encryption failed. Trigger a sync manually, or edit any connection and wait for the automatic sync.
+    zh-CN: 云端数据重新加密失败，请您手动触发同步，或修改任意连接后等待触发自动同步。
+    zh-HK: 雲端資料重新加密失敗，請您手動觸發同步，或修改任意連線後等待觸發自動同步。
   reset_master_key:
     en: Reset Master Key
     zh-CN: 重置主密钥

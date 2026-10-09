@@ -994,22 +994,38 @@ impl SettingsPanel {
                     .keywords([t!("LlmProviders.title").to_string()]),
                 ),
             ),
-            // 账户设置页
-            SettingPage::new(t!("Settings.Account.title")).group(
-                SettingGroup::new().item(
-                    SettingItem::render(move |_options, window, cx| {
-                        render_account_section(window, cx)
-                    })
-                    .keywords([
-                        t!("Settings.Account.title").to_string(),
-                        t!("Settings.Account.username").to_string(),
-                        t!("Settings.Account.email").to_string(),
-                        t!("Settings.Account.not_logged_in").to_string(),
-                        t!("Auth.logout").to_string(),
-                        t!("License.import_offline").to_string(),
-                    ]),
+            // 账户设置页：账户信息与主密钥是两件独立的事——没有账户也可以有主密钥，
+// 所以拆成两个并列分组，关系与「关于 / 更新」一致。
+            SettingPage::new(t!("Settings.Account.title"))
+                .group(
+                    SettingGroup::new().title(t!("Settings.Account.title")).item(
+                        SettingItem::render(move |_options, window, cx| {
+                            render_account_section(window, cx)
+                        })
+                        .keywords([
+                            t!("Settings.Account.title").to_string(),
+                            t!("Settings.Account.username").to_string(),
+                            t!("Settings.Account.email").to_string(),
+                            t!("Settings.Account.not_logged_in").to_string(),
+                            t!("Auth.logout").to_string(),
+                            t!("License.import_offline").to_string(),
+                        ]),
+                    ),
+                )
+                .group(
+                    SettingGroup::new()
+                        .title(t!("Settings.Account.master_key_section"))
+                        .item(
+                            SettingItem::render(move |_options, _window, cx| {
+                                master_key_section(cx)
+                            })
+                            .keywords([
+                                t!("Settings.Account.master_key_section").to_string(),
+                                t!("Encryption.change_repo_password").to_string(),
+                                t!("Encryption.reset_master_key").to_string(),
+                            ]),
+                        ),
                 ),
-            ),
             // 关于页面
             SettingPage::new(t!("Settings.About.title"))
                 .group(
@@ -3029,7 +3045,6 @@ fn render_account_section(_window: &mut Window, cx: &App) -> gpui::AnyElement {
                             }),
                     ),
             )
-            .child(master_key_section(cx))
             .into_any_element()
     } else {
         // 未登录状态：显示提示信息
@@ -3042,22 +3057,18 @@ fn render_account_section(_window: &mut Window, cx: &App) -> gpui::AnyElement {
                     .text_color(cx.theme().muted_foreground)
                     .child(t!("Settings.Account.not_logged_in").to_string()),
             )
-            .child(master_key_section(cx))
             .into_any_element()
     }
 }
 
-/// 账户页的「主密钥」区块：修改、重置，以及重置范围勾选。
+/// 账户页的「主密钥」区块：只放修改与重置两个入口。
 ///
-/// 勾选项默认全部打开（=重置时删除）；取消勾选即可保留该项数据。重置范围放在
-/// 全局状态里，设置页勾选、弹窗确认时读取的是同一份。
+/// 重置时要删哪些数据是「每一次重置」的决定，不是长期配置，所以勾选项放进重置
+/// 弹窗里当场选（默认全选），设置页不再维护这份开关。
 fn master_key_section(cx: &App) -> gpui::Div {
-    let scope = crate::master_key_flow::reset_scope(cx);
-
     v_flex()
         .gap_3()
         .w_full()
-        .mt_4()
         .child(
             div()
                 .text_base()
@@ -3095,85 +3106,6 @@ fn master_key_section(cx: &App) -> gpui::Div {
                         }),
                 ),
         )
-        .child(
-            div()
-                .text_sm()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(t!("Encryption.reset_master_key_scope").to_string()),
-        )
-        .child(reset_scope_row(
-            "reset-scope-team-data",
-            t!("Encryption.reset_scope_team_data").to_string(),
-            t!("Encryption.reset_scope_team_data_desc").to_string(),
-            scope.team_data,
-            cx,
-            |scope, checked| scope.team_data = checked,
-        ))
-        .child(reset_scope_row(
-            "reset-scope-query-history",
-            t!("Encryption.reset_scope_query_history").to_string(),
-            t!("Encryption.reset_scope_query_history_desc").to_string(),
-            scope.query_history,
-            cx,
-            |scope, checked| scope.query_history = checked,
-        ))
-        .child(reset_scope_row(
-            "reset-scope-command-history",
-            t!("Encryption.reset_scope_command_history").to_string(),
-            t!("Encryption.reset_scope_command_history_desc").to_string(),
-            scope.command_history,
-            cx,
-            |scope, checked| scope.command_history = checked,
-        ))
-        .child(reset_scope_row(
-            "reset-scope-notes",
-            t!("Encryption.reset_scope_notes").to_string(),
-            t!("Encryption.reset_scope_notes_desc").to_string(),
-            scope.notes,
-            cx,
-            |scope, checked| scope.notes = checked,
-        ))
-        .child(reset_scope_row(
-            "reset-scope-cloud-sync",
-            t!("Encryption.reset_scope_cloud_sync").to_string(),
-            t!("Encryption.reset_scope_cloud_sync_desc").to_string(),
-            scope.cloud_sync,
-            cx,
-            |scope, checked| scope.cloud_sync = checked,
-        ))
-}
-
-fn reset_scope_row(
-    id: &'static str,
-    title: String,
-    description: String,
-    checked: bool,
-    cx: &App,
-    apply: fn(&mut crate::master_key_flow::ResetScope, bool),
-) -> gpui::Div {
-    h_flex()
-        .justify_between()
-        .items_start()
-        .gap_3()
-        .py_1()
-        .child(
-            v_flex()
-                .gap_1()
-                .flex_1()
-                .child(div().text_sm().child(title))
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(description),
-                ),
-        )
-        .child(Switch::new(id).checked(checked).on_click(move |value, window, cx| {
-            let mut scope = crate::master_key_flow::reset_scope(cx);
-            apply(&mut scope, *value);
-            crate::master_key_flow::set_reset_scope(scope, cx);
-            window.refresh();
-        }))
 }
 
 // ============================================================================
