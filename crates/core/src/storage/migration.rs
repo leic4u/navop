@@ -122,6 +122,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "20261013000001",
         include_str!("../../migrations/20261013000001_remove_builtin_navop_ai_provider.sql"),
     ),
+    (
+        "20261014000001",
+        include_str!("../../migrations/20261014000001_quick_command_is_builtin.sql"),
+    ),
 ];
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
