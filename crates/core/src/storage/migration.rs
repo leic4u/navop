@@ -122,6 +122,10 @@ const MIGRATIONS: &[(&str, &str)] = &[
         "20261014000001",
         include_str!("../../migrations/20261014000001_quick_command_is_builtin.sql"),
     ),
+    (
+        "20261016000001",
+        include_str!("../../migrations/20261016000001_sync_scope_state.sql"),
+    ),
 ];
 
 pub fn run_migrations(conn: &Connection) -> Result<()> {
