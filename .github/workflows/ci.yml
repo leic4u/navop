@@ -174,52 +174,6 @@ jobs:
         shell: bash
         run: sccache --show-stats || true
 
-  build-windows-exe:
-    name: Build Windows x64 exe (test)
-    needs: [prepare]
-    if: ${{ inputs.platform == 'windows' || inputs.platform == 'all' }}
-    runs-on: windows-2022
-    timeout-minutes: 180
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install NASM
-        shell: pwsh
-        run: |
-          choco install nasm --no-progress --yes
-          $nasmDir = Join-Path $env:ProgramFiles "NASM"
-          $nasmDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Setup Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          target: x86_64-pc-windows-msvc
-          cache: false
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-      - name: Build release binary
-        shell: pwsh
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          NAVOP_PUBLIC_BASE_URL: ${{ vars.NAVOP_PUBLIC_BASE_URL }}
-          NAVOP_WEBSITE_BASE_URL: ${{ vars.NAVOP_WEBSITE_BASE_URL }}
-          ONETCLI_TEAM_MANAGEMENT_URL_TEMPLATE: ${{ vars.ONETCLI_TEAM_MANAGEMENT_URL_TEMPLATE }}
-          CARGO_PROFILE_RELEASE_LTO: thin
-          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:VCToolsInstallDir)) { throw "VCToolsInstallDir not configured" }
-          $target = "x86_64-pc-windows-msvc"
-          $linker = Join-Path $env:VCToolsInstallDir "bin\Hostx64\x64\link.exe"
-          if (-not (Test-Path -LiteralPath $linker -PathType Leaf)) { throw "MSVC linker not found at '$linker'" }
-          $env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $linker
-          cargo build --release -p main --features windows-native-rdp --target $target
-      - name: Upload navop.exe
-        uses: actions/upload-artifact@v4
-        with:
-          name: navop-windows-x64-test
-          path: target/x86_64-pc-windows-msvc/release/navop.exe
-
   windows-rdp-probe:
     name: Windows RDP probe (${{ matrix.target }})
     needs: [classify]
