@@ -4,6 +4,32 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 
 <!-- NAVOP_RELEASES -->
 
+## [v0.21.0] - 2026-10-16
+
+#### 更新内容
+
+- 云同步支持「自选同步范围」：设置页新增勾选列表，可逐项选择哪些数据类型参与同步。连接 / 工作空间始终启用且不可取消；钥匙串与 LLM 提供商仅在 Personal 同步可用，切到 Navop 云时强制取消并置灰。
+- 新增多条数据类型的选择性同步：快捷命令、SFTP 收藏路径、已保存 SQL、笔记、LLM 提供商，以及设置项（按字段白名单抽取、应用阶段做字段级三方合并）。
+- 设置页新增每行「上次同步状态」列（上次同步时间，或最近一次失败警告），并在主密钥未设置 / 未解锁时统一提示，避免被误判为同步故障。
+- Personal 与 OnetCloud（Navop 云）两条同步链路都接入了上述范围选择；未识别的 data_type 改为跳过而非报错，便于未来扩展。
+
+国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.0) 下载桌面端安装包
+
+---
+
+#### What's New
+
+- Cloud sync now supports selective sync scope: a new checklist in Settings lets you choose which data types participate in sync. Connections and workspaces are always enabled and cannot be turned off; credentials and LLM providers are available only under Personal sync and are force-unchecked and greyed out when switched to Navop Cloud.
+- New selectively-synced data types: quick commands, SFTP favorite paths, saved SQL, notes, LLM providers, and settings (field-level allowlist extraction with a three-way merge on apply).
+- The settings page shows a per-row "last synced" status column (last sync time or the most recent failure warning), and unifies the prompt when the master key is unset or locked so it is not mistaken for a sync failure.
+- Both Personal and OnetCloud (Navop Cloud) sync paths honor the chosen scope; unknown data types are now skipped instead of erroring, leaving room for future types.
+
+#### Fixes and Improvements
+
+- Notes are wired into the OnetCloud path through a file-system adapter on the `main` side, so the `notes` crate and `one-core` do not form a reverse dependency.
+
+**Full Changelog**: https://github.com/feigeCode/navop/compare/v0.20.0...v0.21.0
+
 ## [v0.20.2] - 2026-10-13
 
 #### 修复与优化
