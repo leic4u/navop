@@ -12,6 +12,7 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 - 新增多条数据类型的选择性同步：快捷命令、SFTP 收藏路径、已保存 SQL、笔记、LLM 提供商，以及设置项（按字段白名单抽取、应用阶段做字段级三方合并）。
 - 设置页新增每行「上次同步状态」列（上次同步时间，或最近一次失败警告），并在主密钥未设置 / 未解锁时统一提示，避免被误判为同步故障。
 - Personal 与 OnetCloud（Navop 云）两条同步链路都接入了上述范围选择；未识别的 data_type 改为跳过而非报错，便于未来扩展。
+- 修复重命名笔记或已保存 SQL 后云端出现重复记录：同步身份从「相对路径」改为随文件走的稳定 ID，改名后仍是同一条记录（对端表现为重命名，而不是新增一条）。
 
 国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.0) 下载桌面端安装包
 
@@ -27,6 +28,7 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 #### Fixes and Improvements
 
 - Notes are wired into the OnetCloud path through a file-system adapter on the `main` side, so the `notes` crate and `one-core` do not form a reverse dependency.
+- Fixed duplicate cloud records after renaming a note or a saved SQL file: sync identity moved from the relative path to a stable ID that travels with the file, so a rename updates the same record instead of creating a second one (and shows up as a rename on other devices).
 
 **Full Changelog**: https://github.com/feigeCode/navop/compare/v0.20.0...v0.21.0
 
