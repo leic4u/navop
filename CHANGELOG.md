@@ -13,6 +13,8 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 - 设置页新增每行「上次同步状态」列（上次同步时间，或最近一次失败警告），并在主密钥未设置 / 未解锁时统一提示，避免被误判为同步故障。
 - Personal 与 OnetCloud（Navop 云）两条同步链路都接入了上述范围选择；未识别的 data_type 改为跳过而非报错，便于未来扩展。
 - 修复重命名笔记或已保存 SQL 后云端出现重复记录：同步身份从「相对路径」改为随文件走的稳定 ID，改名后仍是同一条记录（对端表现为重命名，而不是新增一条）。
+- 修复 Personal（文件夹 / Git / WebDAV）同步下同一类型只剩一条数据：此前首次上传时记录 ID 为空，导致该类型所有记录都写成同一个无名 `.json` 并互相覆盖（表现为「只有一条、每次同步 version 都涨」）。现在首次上传会生成新的 UUID。
+- 同步范围列表的每一类都会显示上次同步状态：此前从未同步过的类型整行空白，现在显示「从未同步」。
 
 国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.0) 下载桌面端安装包
 
@@ -29,6 +31,8 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 
 - Notes are wired into the OnetCloud path through a file-system adapter on the `main` side, so the `notes` crate and `one-core` do not form a reverse dependency.
 - Fixed duplicate cloud records after renaming a note or a saved SQL file: sync identity moved from the relative path to a stable ID that travels with the file, so a rename updates the same record instead of creating a second one (and shows up as a rename on other devices).
+- Fixed Personal sync (folder / Git / WebDAV) collapsing every record of a type into a single one: first-time uploads used an empty record ID, so all records of that type were written to the same nameless `.json` and overwrote each other (only one item survived and its version kept growing). New uploads now generate a UUID.
+- Every row in the sync scope list now shows a last-sync status: types that have never synced used to render a blank status and now report "never synced".
 
 **Full Changelog**: https://github.com/feigeCode/navop/compare/v0.20.0...v0.21.0
 
