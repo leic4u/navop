@@ -15,6 +15,8 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 - 修复重命名笔记或已保存 SQL 后云端出现重复记录：同步身份从「相对路径」改为随文件走的稳定 ID，改名后仍是同一条记录（对端表现为重命名，而不是新增一条）。
 - 修复 Personal（文件夹 / Git / WebDAV）同步下同一类型只剩一条数据：此前首次上传时记录 ID 为空，导致该类型所有记录都写成同一个无名 `.json` 并互相覆盖（表现为「只有一条、每次同步 version 都涨」）。现在首次上传会生成新的 UUID。
 - 同步范围列表的每一类都会显示上次同步状态：此前从未同步过的类型整行空白，现在显示「从未同步」。
+- 修复连接 / 工作空间 / 钥匙串始终显示「未同步」：这三类不走「数据范围」扩展源，此前没有任何地方记录它们的同步状态。现在上传、下载以及「已是最新」三种情况都会写入状态。
+- 「上次同步」改为绝对时间（例如「上次同步：2026/10/21 00:22:55」），不再使用「刚刚 / N 分钟前」这类相对文案——自动同步每 60 秒一轮，相对文案几乎永远显示「刚刚」，看不出真正的时间。
 
 国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.0) 下载桌面端安装包
 
@@ -33,6 +35,8 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 - Fixed duplicate cloud records after renaming a note or a saved SQL file: sync identity moved from the relative path to a stable ID that travels with the file, so a rename updates the same record instead of creating a second one (and shows up as a rename on other devices).
 - Fixed Personal sync (folder / Git / WebDAV) collapsing every record of a type into a single one: first-time uploads used an empty record ID, so all records of that type were written to the same nameless `.json` and overwrote each other (only one item survived and its version kept growing). New uploads now generate a UUID.
 - Every row in the sync scope list now shows a last-sync status: types that have never synced used to render a blank status and now report "never synced".
+- Fixed connections, workspaces and credentials always showing "not synced": those types are handled outside the sync-scope extension source and never had their sync status recorded. Uploads, downloads and "already up to date" now all write a status.
+- "Last sync" now uses an absolute timestamp (e.g. "Last sync: 2026/10/21 00:22:55") instead of relative wording like "just now" — with auto sync running every 60 seconds, relative wording was almost always "just now".
 
 **Full Changelog**: https://github.com/feigeCode/navop/compare/v0.20.0...v0.21.0
 
