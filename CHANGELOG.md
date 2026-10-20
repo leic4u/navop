@@ -17,6 +17,7 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 - 同步范围列表的每一类都会显示上次同步状态：此前从未同步过的类型整行空白，现在显示「从未同步」。
 - 修复连接 / 工作空间 / 钥匙串始终显示「未同步」：这三类不走「数据范围」扩展源，此前没有任何地方记录它们的同步状态。现在上传、下载以及「已是最新」三种情况都会写入状态。
 - 「上次同步」改为绝对时间（例如「上次同步：2026/10/21 00:22:55」），不再使用「刚刚 / N 分钟前」这类相对文案——自动同步每 60 秒一轮，相对文案几乎永远显示「刚刚」，看不出真正的时间。
+- 修改设置项后会**立刻触发一次同步**（此前只能等 60 秒的周期扫描或手动点「立即同步」）。只对白名单字段真正变了的、且已勾选同步的分组生效；同步开关与同步范围本身不在白名单内，不会产生「改设置 → 触发同步 → 又改设置」的自激循环。
 
 国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.0) 下载桌面端安装包
 
@@ -37,6 +38,7 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 - Every row in the sync scope list now shows a last-sync status: types that have never synced used to render a blank status and now report "never synced".
 - Fixed connections, workspaces and credentials always showing "not synced": those types are handled outside the sync-scope extension source and never had their sync status recorded. Uploads, downloads and "already up to date" now all write a status.
 - "Last sync" now uses an absolute timestamp (e.g. "Last sync: 2026/10/21 00:22:55") instead of relative wording like "just now" — with auto sync running every 60 seconds, relative wording was almost always "just now".
+- Changing a setting now triggers a sync immediately (it previously waited for the 60-second periodic scan or a manual "sync now"). It fires only for groups whose allow-listed fields actually changed and that are enabled for sync; the sync toggles and the sync scope itself are not in any allow list, so there is no "change settings → sync → write settings" feedback loop.
 
 **Full Changelog**: https://github.com/feigeCode/navop/compare/v0.20.0...v0.21.0
 
