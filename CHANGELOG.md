@@ -4,6 +4,32 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 
 <!-- NAVOP_RELEASES -->
 
+## [v0.21.1] - 2026-10-21
+
+#### 更新内容
+
+- 修复「没有修改任何内容，每次点立即同步版本号都 +1」：自选同步的各类型（快捷命令、SFTP 收藏路径、已保存 SQL、笔记、LLM 提供商、设置项）此前有两套校验和口径，快照侧与记录侧永远不相等，每轮都被判定为「本地已变更」而重复上传。现在两边同口径，内容没变就不会产生新版本（连接配置类此前就是正常的）。
+- 同步触发策略重做，大幅降低服务器压力：从「固定每分钟把所有数据项同步一轮」改为变更驱动——修改 LLM 提供商、Agent 设置、快捷键设置等已勾选的数据后触发同步；距上次同步不足一分钟时延迟到满一分钟再跑，把这一分钟内的所有变更合并成一轮；本地长时间无变更时每 10 分钟同步一次（用于拉取其他设备的改动）。手动点「立即同步」仍然立即执行，不受冷却限制。
+- 修复「在设置里勾选了新的同步数据类型，立即同步后该类数据还是不出现」：同步范围变化后会热更新同步范围，并立刻上传新勾选类型的数据。
+- 修复同步进行中点击「立即同步」被静默丢弃的问题：现在会排队，上一轮结束后自动补跑。
+- 运行时启动后立即执行一轮同步：后端配置问题（例如 Git 后端指向的目录不是仓库）会立刻在状态区暴露，而不是等到点击「立即同步 / 测试连接」才报错。
+- 说明：升级后首次同步时，v0.21.0 期间已上传的存量记录会因上述校验和口径修正被重传一次（版本号 +1 一次），之后恢复稳定，不会持续虚增。
+
+国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.1) 下载桌面端安装包
+
+---
+
+#### What's New
+
+- Fixed phantom version bumps: every "sync now" click used to bump the version of each selectively synced type (quick commands, SFTP favorites, saved SQL, notes, LLM providers, settings) even when nothing had changed. The snapshot side and the record side computed checksums with two different serializations, so they never matched and every pass re-uploaded identical content. Both sides now share one checksum definition, and unchanged content no longer produces a new version (connection-style records were already stable).
+- Reworked the sync trigger strategy to cut server load: instead of a fixed full sync of every type once per minute, sync is now change-driven. Editing an LLM provider, agent settings, keybindings, etc. triggers a sync; changes arriving within one minute of the previous pass are coalesced into a single pass that runs once the minute elapses; when nothing changes locally, a pass still runs every 10 minutes to pull in other devices' changes. Manual "sync now" still runs immediately and bypasses the cooldown.
+- Fixed newly checked sync-scope types never appearing after "sync now": changing the sync scope now hot-updates the runtime and uploads the newly enabled types right away.
+- Fixed "sync now" clicks being silently dropped while a pass was in flight: they are now queued and run automatically after the current pass finishes.
+- The runtime now runs one pass immediately on startup, so backend misconfiguration (e.g. a Git backend pointing at a directory that is not a repository) surfaces in the status area right away instead of only when clicking "sync now" / "test connection".
+- Note: after upgrading, records uploaded under v0.21.0 are re-uploaded once on the first sync because of the checksum fix above (version +1 exactly once), then stay stable.
+
+**Full Changelog**: https://github.com/feigeCode/navop/compare/v0.21.0...v0.21.1
+
 ## [v0.21.0] - 2026-10-16
 
 #### 更新内容
