@@ -4,6 +4,28 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 
 <!-- NAVOP_RELEASES -->
 
+## [v0.21.2] - 2026-10-22
+
+#### 更新内容
+
+- 修复「修改设置、添加 LLM 提供商后，同步迟迟不触发（体感就是没反应）」：变更合并窗口从 60 秒缩短到 10 秒——单次变更现在最多等 10 秒就会同步（v0.21.1 实测要等 20 秒以上），连续改多项仍然会合并成一轮，不会改一次传一次。手动点「立即同步」依旧立即执行。
+- 加固启动轮：同步运行时建立时会入队一轮全量扫描，若因主线程冻结等原因丢失，调度器现在会检测到「还从未跑过轮次」并在 1 秒内补跑，不再让启动后的本地变更干等。
+- 修复设置类数据被误判为「双方冲突」：一轮同步完成后，现在会把校验和与内容时间戳一并写入同步状态表（此前只写了云端 ID 和时间戳）。不落的后果是每轮都认为「本地已变更」——远端设备单方面改的设置会被误判成冲突，这也是同步状态表里校验和列一直为空的根因。
+- 同步触发链路全链路增加中文日志：变更入队、被哪道闸门拦下（总开关 / provider / 自动同步子开关 / 运行时未就绪）、冷却延迟、开始同步、本轮完成 / 失败，都能在日志文件里直接看到，排查不再需要靠时间线反推。
+
+国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.2) 下载桌面端安装包
+
+---
+
+#### What's New
+
+- Fixed "editing settings or adding an LLM provider doesn't trigger sync (or feels like it never does)": the change-coalescing window is shortened from 60 seconds to 10 seconds, so a single change now syncs within at most 10 seconds (v0.21.1 measured 20+ seconds in practice). Bursts of consecutive changes are still coalesced into a single pass, and manual "sync now" still runs immediately.
+- Hardened the startup pass: when the sync runtime starts it enqueues a full scan; if that pass is lost (e.g. the main thread freezes during init), the scheduler now detects "no pass has ever run" and reruns it within 1 second instead of leaving post-startup local changes waiting.
+- Fixed settings-type data being misjudged as "both modified" conflicts: after a pass completes, the checksum and content timestamp are now persisted into the sync state table (previously only the cloud id and timestamp were stored). Without them every pass treated settings as locally changed, so remote-only settings edits were reported as conflicts — this also explains the permanently empty checksum column.
+- Added end-to-end Chinese logging across the sync trigger chain: event enqueued, which gate dropped it (master switch / provider / auto-sync sub-switch / runtime not ready), cooldown deferral, pass start, and pass completion/failure are all visible in the log file, so troubleshooting no longer requires reconstructing timelines.
+
+**Full Changelog**: https://github.com/feigeCode/navop/compare/v0.21.1...v0.21.2
+
 ## [v0.21.1] - 2026-10-21
 
 #### 更新内容
