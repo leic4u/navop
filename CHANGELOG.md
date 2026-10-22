@@ -4,6 +4,24 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 
 <!-- NAVOP_RELEASES -->
 
+## [v0.21.3] - 2026-10-22
+
+#### 更新内容
+
+- 修复「新设备拉取同步数据报错 personal sync io error: UNIQUE constraint failed: llm_providers.id，整个同步轮次失败」：本地没有对应行的 LLM 提供商记录落库时以 id=0 插入，显式绑定 0 会占掉数据库行号 0，第二条提供商记录立刻撞主键。现在 id=0 改由数据库自动分配行号并回写，拉取多个提供商不再报错。已受影响的设备无需手动处理：失败的那条记录下次同步会自动补上。
+- 说明：只有「拉取」路径有此问题（上传一直正常）；Navop 云同步链路存在同源问题，本次在存储层一并修复。
+
+国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.3) 下载桌面端安装包
+
+---
+
+#### What's New
+
+- Fixed "pulling sync data on a new device fails with personal sync io error: UNIQUE constraint failed: llm_providers.id, aborting the whole sync pass": LLM provider records without an existing local row were inserted with an explicit id of 0, which occupies rowid 0, so the second provider record immediately collided with the primary key. An id of 0 now lets SQLite assign a fresh rowid (written back to the item), so pulling multiple providers works. Affected devices heal automatically — the failed record is re-downloaded on the next pass, no manual steps needed.
+- Note: only the pull path was affected (uploads always worked); the Navop Cloud sync path had the same root cause and is fixed by the same storage-layer change.
+
+**Full Changelog**: https://github.com/feigeCode/navop/compare/v0.21.2...v0.21.3
+
 ## [v0.21.2] - 2026-10-22
 
 #### 更新内容
