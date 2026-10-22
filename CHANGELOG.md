@@ -4,6 +4,24 @@ Navop user-facing release notes. Generate and review each bilingual version entr
 
 <!-- NAVOP_RELEASES -->
 
+## [v0.21.4] - 2026-10-23
+
+#### 更新内容
+
+- 修复「同步成功后，设置页的 LLM 提供商列表不刷新，要重新打开页面才看到新提供商」：后台同步是把记录直接写进数据库的，此前不会通知界面。现在①设置页的提供商列表会实时响应提供商变更；②每轮同步成功后，如果本轮拉取或更新过提供商，会主动发出变更通知并清理提供商缓存（手动点「立即同步」同样生效）。
+- 说明：连接 / 工作空间 / 钥匙串三类暂未接入该通知——它们的变更总线同时是同步自己的触发源，从同步里回发会形成自激循环，需要单独设计；这三类数据重新打开对应页面即可看到最新状态。
+
+国内下载：如果 GitHub 下载较慢，可从 [CNB 镜像](https://cnb.cool/navop-dev/navop/-/releases/tag/v0.21.4) 下载桌面端安装包
+
+---
+
+#### What's New
+
+- Fixed "after a successful sync, the LLM provider list in Settings doesn't refresh — you have to reopen the page to see the newly synced provider": background sync writes records straight to the database and never notified the UI. Now (1) the Settings provider list subscribes to provider changes and reloads on them, and (2) after each successful pass, if providers were downloaded or updated in that pass, the sync emits the change notification and clears the provider cache (manual "sync now" included).
+- Note: connections / workspaces / credentials are not wired to this notification yet — their change bus is also the sync's own trigger source, so echoing back from the sync would create a self-excitation loop and needs a separate design; those types show their latest state after reopening their page.
+
+**Full Changelog**: https://github.com/feigeCode/navop/compare/v0.21.3...v0.21.4
+
 ## [v0.21.3] - 2026-10-22
 
 #### 更新内容
